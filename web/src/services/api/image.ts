@@ -309,7 +309,7 @@ function readAxiosError(error: unknown, fallback: string) {
         const apiMsg = readApiErrorMessage(responseData);
         if (apiMsg) return apiMsg;
         // Infer the error from the HTTP status when the response body has no usable message.
-        const statusMsg = readStatusError(error.response?.status, fallback);
+        const statusMsg = error.response?.status ? readStatusError(error.response.status, fallback) : "";
         if (statusMsg) return statusMsg;
         // Fall back to Axios's own error message.
         return error.message || fallback;
@@ -731,7 +731,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                 params: { size: requestSize, quality, count: n, ...(background ? { background } : {}) },
                 signal: options?.signal,
             });
-            return normalizePluginImages(result).map((dataUrl) => ({ id: nanoid(), dataUrl }));
+            return normalizePluginImages(result, requestConfig.baseUrl).map((dataUrl) => ({ id: nanoid(), dataUrl }));
         } catch (error) {
             throw new Error(readAxiosError(error, apiText("requestFailed")));
         }
@@ -791,7 +791,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
                 params: { size: requestSize, quality, count: n, ...(background ? { background } : {}) },
                 signal: options?.signal,
             });
-            return normalizePluginImages(result).map((dataUrl) => ({ id: nanoid(), dataUrl }));
+            return normalizePluginImages(result, requestConfig.baseUrl).map((dataUrl) => ({ id: nanoid(), dataUrl }));
         } catch (error) {
             throw new Error(readAxiosError(error, apiText("requestFailed")));
         }

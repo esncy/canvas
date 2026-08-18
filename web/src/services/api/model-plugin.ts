@@ -363,17 +363,53 @@ return text;`,
     };
 }
 
-/** Normalize whatever an image script returns into the app's generated-image shape. */
-export function normalizePluginImages(result: unknown): string[] {
-    const items = Array.isArray(result) ? result : [result];
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function resolvePluginImageUrl(value: string, baseUrl: string) {
+    const source = value.trim();
+    if (!source || /^(?:data|blob|https?):/i.test(source)) return source;
+    try {
+        return new URL(source, baseUrl).toString();
+    } catch {
+        return source;
+    }
+}
+
+function pluginImageItems(result: unknown) {
+    if (Array.isArray(result)) return result;
+    if (isRecord(result)) {
+        for (const key of ["data", "images", "results"]) {
+            if (Array.isArray(result[key])) return result[key];
+        }
+    }
+    return [result];
+}
+
+/** Normalize an image script result, including a raw OpenAI-style response envelope. */
+export function normalizePluginImages(result: unknown, baseUrl = ""): string[] {
+    const items = pluginImageItems(result);
     const urls = items
         .map((item) => {
-            if (typeof item === "string") return item;
-            if (item && typeof item === "object") {
-                const record = item as Record<string, unknown>;
-                if (typeof record.dataUrl === "string") return record.dataUrl;
-                if (typeof record.url === "string") return record.url;
-                if (typeof record.b64_json === "string") return `data:image/png;base64,${record.b64_json}`;
+            if (typeof item === "string") return resolvePluginImageUrl(item, baseUrl);
+            if (isRecord(item)) {
+                const imageUrl =
+                    typeof item.dataUrl === "string"
+                        ? item.dataUrl
+                        : typeof item.url === "string"
+                          ? item.url
+                          : typeof item.image_url === "string"
+                            ? item.image_url
+                            : isRecord(item.image_url) && typeof item.image_url.url === "string"
+                              ? item.image_url.url
+                              : "";
+                if (imageUrl) return resolvePluginImageUrl(imageUrl, baseUrl);
+                if (typeof item.b64_json === "string" && item.b64_json) return `data:image/png;base64,${item.b64_json}`;
+                if (typeof item.base64 === "string" && item.base64) return `data:image/png;base64,${item.base64}`;
+                if (typeof item.data === "string" && item.data) {
+                    return /^(?:data|blob|https?):/i.test(item.data) ? resolvePluginImageUrl(item.data, baseUrl) : `data:image/png;base64,${item.data}`;
+                }
             }
             return "";
         })

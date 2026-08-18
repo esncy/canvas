@@ -1,10 +1,13 @@
 import { ArrowRight } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
-import { App, Button, Image, Tag } from "antd";
+import { App, Button, Tag } from "antd";
 import { useNavigate } from "react-router-dom";
 import { Trans, useTranslation } from "react-i18next";
 
 import { fetchPrompts, type Prompt } from "@/services/api/prompts";
+import { useCopyText } from "@/hooks/use-copy-text";
+import { PromptDetailDialog } from "@/pages/prompts/components/prompt-detail-dialog";
+import { useAssetStore } from "@/stores/use-asset-store";
 import { navigationTools } from "@/constant/navigation-tools";
 import i18n from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -26,10 +29,14 @@ export default function IndexPage() {
     const { message } = App.useApp();
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const copyText = useCopyText();
+    const addAsset = useAssetStore((state) => state.addAsset);
     const [primaryTool] = navigationTools;
     const [promptShowcase, setPromptShowcase] = useState<Prompt[]>([]);
-    const [previewIndex, setPreviewIndex] = useState(0);
-    const [previewOpen, setPreviewOpen] = useState(false);
+    const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
+    const savePromptAsset = (item: Prompt) => {
+        addAsset({ kind: "text", title: item.title, coverUrl: item.coverUrl, tags: item.tags, source: item.category, data: { content: item.prompt }, metadata: { source: "prompt-library", promptId: item.id, githubUrl: item.githubUrl } });
+    };
 
     useEffect(() => {
         void fetchPrompts({ pageSize: 12 })
@@ -74,10 +81,7 @@ export default function IndexPage() {
                             <button
                                 key={item.id}
                                 type="button"
-                                onClick={() => {
-                                    setPreviewIndex(index);
-                                    setPreviewOpen(true);
-                                }}
+                                onClick={() => setSelectedPrompt(item)}
                                 className={cn(
                                     "group relative cursor-pointer overflow-hidden border border-stone-200 bg-stone-100 text-left dark:border-stone-800 dark:bg-stone-900",
                                     index === 0 && "md:col-span-2 md:row-span-2",
@@ -101,20 +105,7 @@ export default function IndexPage() {
                     </div>
                 </section>
             </section>
-            <Image.PreviewGroup
-                preview={{
-                    open: previewOpen,
-                    current: previewIndex,
-                    onOpenChange: setPreviewOpen,
-                    onChange: setPreviewIndex,
-                }}
-            >
-                <div className="hidden">
-                    {promptShowcase.map((item) => (
-                        <Image key={item.id} src={item.coverUrl} alt={item.title} />
-                    ))}
-                </div>
-            </Image.PreviewGroup>
+            <PromptDetailDialog prompt={selectedPrompt} onClose={() => setSelectedPrompt(null)} onCopy={(value) => copyText(value, t("common.promptCopied"))} onSaveAsset={savePromptAsset} />
         </main>
     );
 }

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>大狗AI画布文档</title>
+  <style>
+    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #111; color: #eee; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #111; }
+    a { color: inherit; }
+    .top { position: sticky; top: 0; z-index: 2; border-bottom: 1px solid #2b2b2b; background: rgba(17,17,17,.96); backdrop-filter: blur(14px); }
+    .top-inner { display: flex; align-items: center; gap: 22px; max-width: 1080px; min-height: 64px; margin: 0 auto; padding: 0 24px; }
+    .brand { font-weight: 700; text-decoration: none; white-space: nowrap; }
+    .tabs { display: flex; gap: 6px; overflow-x: auto; }
+    .tab { border: 0; border-bottom: 2px solid transparent; padding: 21px 10px 18px; color: #999; background: transparent; cursor: pointer; white-space: nowrap; font: inherit; }
+    .tab.active { border-bottom-color: #fff; color: #fff; }
+    .back { margin-left: auto; color: #aaa; text-decoration: none; white-space: nowrap; font-size: 13px; }
+    main { max-width: 820px; margin: 0 auto; padding: 56px 24px 96px; }
+    article { display: none; }
+    article.active { display: block; }
+    .eyebrow { color: #999; font-size: 13px; }
+    h1 { margin: 10px 0 14px; font-size: clamp(30px, 5vw, 44px); line-height: 1.15; }
+    h2 { margin: 42px 0 14px; padding-top: 28px; border-top: 1px solid #2b2b2b; font-size: 24px; }
+    p, li { color: #c6c6c6; font-size: 15px; line-height: 1.9; }
+    ul, ol { padding-left: 1.4em; }
+    code, pre { font-family: "SFMono-Regular", Consolas, monospace; }
+    code { padding: 2px 5px; border-radius: 4px; background: #222; color: #eee; }
+    pre { overflow-x: auto; margin: 16px 0; padding: 16px; border: 1px solid #2b2b2b; border-radius: 8px; background: #181818; color: #ddd; line-height: 1.65; white-space: pre-wrap; }
+    .note { margin: 20px 0; padding: 14px 16px; border-left: 3px solid #aaa; background: #1b1b1b; color: #c6c6c6; line-height: 1.8; }
+    @media (max-width: 640px) { .top-inner { gap: 12px; padding: 0 16px; } .back { display: none; } main { padding: 36px 18px 72px; } }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="top-inner">
+      <a class="brand" href="../canvas">大狗AI画布</a>
+      <nav class="tabs" aria-label="文档导航">
+        <button class="tab active" type="button" data-doc="guide">大狗AI画布使用与 Agent</button>
+        <button class="tab" type="button" data-doc="manual">节点与快捷键</button>
+      </nav>
+      <a class="back" href="../canvas">打开画布</a>
+    </div>
+  </header>
+  <main>
+    <article class="active" data-page="guide">
+      <div class="eyebrow">文档入口 · 大狗AI画布</div>
+      <h1>大狗AI画布使用与 Agent</h1>
+      <p>大狗AI画布提供 Codex App 插件，把 Codex 和本地 Canvas Agent 连接起来。安装后，可以让 Codex 打开画布、读取节点、创建节点、连接流程并触发生成。</p>
+      <h2>安装 Codex App 插件</h2>
+      <p>把下面的请求发给 Codex：</p>
+      <pre>请从 https://github.com/esncy/infinite-canvas.git 安装大狗AI画布 Codex 插件。
+请 clone 仓库到 ~/plugins/infinite-canvas，确认 plugins/infinite-canvas/.codex-plugin/plugin.json 存在，
+把仓库加入 personal marketplace，再安装 infinite-canvas 插件。</pre>
+      <p>也可以手动安装：</p>
+      <pre>mkdir -p ~/plugins
+git clone https://github.com/esncy/infinite-canvas.git ~/plugins/infinite-canvas
+cd ~/plugins/infinite-canvas
+codex plugin marketplace add "$(pwd)"
+codex plugin add infinite-canvas@infinite-canvas-local</pre>
+      <h2>使用插件</h2>
+      <pre>打开大狗AI画布新建画布并连接好 Codex
+读取当前画布并总结节点结构
+根据选中节点创建一组生图提示词</pre>
+      <p>插件会启动本地 Canvas Agent，然后打开本地测试站：</p>
+      <pre>http://localhost:4000/canvas?mode=new&amp;agentUrl=&lt;Local URL&gt;&amp;agentToken=&lt;Connect token&gt;</pre>
+      <p>手动启动 Agent：</p>
+      <pre>npx -y @esncy/canvas-agent
+npx -y @esncy/canvas-agent mcp</pre>
+      <p>MCP 服务名继续使用 <code>infinite-canvas</code>，内部 Agent 服务名继续使用 <code>canvas-agent</code>。包名是 <code>@esncy/canvas-agent</code>。</p>
+      <h2>本地连接原理</h2>
+      <pre>Codex / 浏览器侧边栏
+        |
+        v
+本机 Canvas Agent
+        |
+        v
+浏览器画布 React 状态</pre>
+      <p>Canvas Agent 默认监听 <code>http://127.0.0.1:17371</code>，启动后生成 Connect token。网页通过 SSE 接收工具调用，画布状态通过 Agent 同步，Codex 调用工具时由 Agent 转发到浏览器。</p>
+      <h2>安全与配置</h2>
+      <ul>
+        <li>Canvas Agent 默认只监听 <code>127.0.0.1</code>，网页连接必须携带 Connect token。</li>
+        <li>AI API Key、画布、素材和生成记录默认保存在浏览器本地。</li>
+        <li>NEW API 只作为用户填写的 OpenAI 兼容 Base URL；用户在自己的 <code>/token</code> 页面创建 API Key。</li>
+        <li>内置提示词按公开来源运行时读取，提示词图片和 JSON 不在本 Fork 内复制。</li>
+      </ul>
+    </article>
+    <article data-page="manual">
+      <div class="eyebrow">文档入口 · 节点操作</div>
+      <h1>节点与快捷键</h1>
+      <p>文本节点保存提示词和说明，图片节点用于生成与参考，视频节点用于视频输入或生成。节点可以通过连线组成可重复的创作流程。</p>
+      <h2>文本节点</h2>
+      <ul>
+        <li>双击文本节点内容区域直接编辑。</li>
+        <li>选中文本节点后，使用顶部工具栏的“编辑文字”进入编辑状态。</li>
+        <li>输入框支持 <code>@</code> 引用已连接的图片、文本、视频和音频资源。</li>
+        <li>输入框里的模型来自全局配置；没有模型时，先在配置中拉取或手动填写模型名。</li>
+      </ul>
+      <h2>图片节点</h2>
+      <ul>
+        <li>文本节点点击“生图”会在右侧创建生成配置节点并开始生成。</li>
+        <li>选中空图片节点点击“生成”会直接回填当前节点；数量大于 1 时继续创建子图节点。</li>
+        <li>已有内容的图片节点会沿用图片作为参考图。</li>
+        <li>生成节点会记录提示词、生成类型、模型、尺寸、数量和参考图引用，便于重试。</li>
+      </ul>
+      <h2>视频节点</h2>
+      <ul>
+        <li>可以通过工具栏新建视频节点，也可以拖入或上传本地视频。</li>
+        <li>空视频节点可以输入提示词生成视频，结果会回填当前节点。</li>
+        <li>视频模式会读取上游文本作为 prompt，读取图片和视频作为参考输入。</li>
+      </ul>
+      <h2>推荐流程</h2>
+      <ol>
+        <li>新建文本节点，写入图片创作想法。</li>
+        <li>用节点下方对话框优化或扩写提示词。</li>
+        <li>确认文本后点击“生图”。</li>
+        <li>在生成配置节点调整模型、比例和数量，再次生成。</li>
+      </ol>
+      <h2>视图与编辑快捷键</h2>
+      <ul>
+        <li>拖动画布空白处：平移视图；鼠标滚轮：缩放画布。</li>
+        <li><code>Ctrl / Cmd + A</code>：全选节点。</li>
+        <li><code>Ctrl / Cmd + C</code> / <code>Ctrl / Cmd + V</code>：复制和粘贴节点。</li>
+        <li><code>Delete / Backspace</code>：删除节点或连线。</li>
+        <li><code>Esc</code>：取消选择并关闭当前浮层。</li>
+        <li><code>Ctrl / Cmd + Z</code>：撤销。</li>
+        <li><code>Ctrl / Cmd + Shift + Z</code> 或 <code>Ctrl / Cmd + Y</code>：重做。</li>
+      </ul>
+      <div class="note">撤销和重做记录节点、连线、视口、背景模式和助手会话变化；项目名称、账号状态、全局 AI 配置和“我的素材”保存操作不属于当前画布历史。</div>
+    </article>
+  </main>
+  <script>
+    document.querySelectorAll("[data-doc]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var page = button.getAttribute("data-doc");
+        document.querySelectorAll("[data-doc]").forEach(function (item) { item.classList.toggle("active", item === button); });
+        document.querySelectorAll("article[data-page]").forEach(function (article) { article.classList.toggle("active", article.getAttribute("data-page") === page); });
+        history.replaceState(null, "", "#" + page);
+      });
+    });
+    if (location.hash === "#manual") document.querySelector('[data-doc="manual"]').click();
+  </script>
+</body>
+</html>

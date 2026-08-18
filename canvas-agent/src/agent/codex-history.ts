@@ -689,7 +689,7 @@ function routeName(path: string) {
     if (path.startsWith("/canvas/")) return "指定画布";
     if (path.startsWith("/image")) return "生图工作台";
     if (path.startsWith("/video")) return "视频工作台";
-    if (path.startsWith("/prompts")) return "提示词中心";
+    if (path.startsWith("/prompts")) return "提示词库";
     if (path.startsWith("/assets")) return "我的素材";
     if (path.startsWith("/config")) return "配置页面";
     return path;

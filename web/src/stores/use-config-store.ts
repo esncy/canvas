@@ -63,36 +63,46 @@ export type WebdavSyncConfig = {
 export type ConfigTabKey = "channels" | "preferences" | "prompt-sources" | "webdav" | "local-storage";
 
 export const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
+export const DEFAULT_CHANNEL_ID = "dagouai";
 const CHANNEL_MODEL_SEPARATOR = "::";
 const OPENAI_BASE_URL = "https://api.openai.com";
+const DAGOUI_BASE_URL = "https://dagouai.cc.cd";
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
 const ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
+const DEFAULT_CHANNEL_MODELS: ChannelModel[] = [
+    { name: "gpt-image-2", capability: "image" },
+    { name: "grok-imagine-video", capability: "video" },
+    { name: "gpt-5.6-luna", capability: "text" },
+    { name: "gpt-4o-mini-tts", capability: "audio" },
+];
+const DAGOUI_DEFAULT_MODEL_VALUES: Record<string, string> = {
+    "default::gpt-image-2": "dagouai::gpt-image-2",
+    "default::grok-imagine-video": "dagouai::grok-imagine-video",
+    "default::gpt-5.5": "dagouai::gpt-5.6-luna",
+    "dagouai::gpt-5.5": "dagouai::gpt-5.6-luna",
+    "default::gpt-4o-mini-tts": "dagouai::gpt-4o-mini-tts",
+};
 
 export const defaultConfig: AiConfig = {
     channelMode: "local",
-    baseUrl: OPENAI_BASE_URL,
+    baseUrl: DAGOUI_BASE_URL,
     apiKey: "",
     apiFormat: "openai",
     channels: [
         {
-            id: "default",
-            name: i18n.t("config.channels.defaultName"),
-            baseUrl: OPENAI_BASE_URL,
+            id: DEFAULT_CHANNEL_ID,
+            name: i18n.t("config.channels.dagouName"),
+            baseUrl: DAGOUI_BASE_URL,
             apiKey: "",
             apiFormat: "openai",
-            models: [
-                { name: "gpt-image-2", capability: "image" },
-                { name: "grok-imagine-video", capability: "video" },
-                { name: "gpt-5.5", capability: "text" },
-                { name: "gpt-4o-mini-tts", capability: "audio" },
-            ],
+            models: DEFAULT_CHANNEL_MODELS.map((model) => ({ ...model })),
         },
     ],
-    model: "default::gpt-image-2",
-    imageModel: "default::gpt-image-2",
-    videoModel: "default::grok-imagine-video",
-    textModel: "default::gpt-5.5",
-    audioModel: "default::gpt-4o-mini-tts",
+    model: "dagouai::gpt-image-2",
+    imageModel: "dagouai::gpt-image-2",
+    videoModel: "dagouai::grok-imagine-video",
+    textModel: "dagouai::gpt-5.6-luna",
+    audioModel: "dagouai::gpt-4o-mini-tts",
     audioVoice: "alloy",
     audioFormat: "mp3",
     audioSpeed: "1",
@@ -103,12 +113,12 @@ export const defaultConfig: AiConfig = {
     videoWatermark: "false",
     systemPrompt: "",
     reasoningEffort: "auto",
-    models: ["default::gpt-image-2", "default::grok-imagine-video", "default::gpt-5.5", "default::gpt-4o-mini-tts"],
+    models: ["dagouai::gpt-image-2", "dagouai::grok-imagine-video", "dagouai::gpt-5.6-luna", "dagouai::gpt-4o-mini-tts"],
     quality: "auto",
     size: "1:1",
     background: "",
     count: "1",
-    canvasImageCount: "3",
+    canvasImageCount: "1",
 };
 
 export const defaultWebdavSyncConfig: WebdavSyncConfig = {
@@ -221,8 +231,8 @@ export const useConfigStore = create<ConfigStore>()(
                 const persistedConfig = (persistedState.config || {}) as Partial<AiConfig>;
                 const persistedWebdav = (persistedState.webdav || {}) as Partial<WebdavSyncConfig>;
                 const config = { ...defaultConfig, ...persistedConfig };
-                if (!Array.isArray(persistedConfig.channels)) config.channels = [];
-                const channels = normalizeChannels(config);
+                if (persistedState.config && !Array.isArray(persistedConfig.channels)) config.channels = [];
+                const channels = ensureDagouChannel(normalizeChannels(config));
                 const models = modelOptionsFromChannels(channels);
                 return {
                     ...current,
@@ -233,10 +243,11 @@ export const useConfigStore = create<ConfigStore>()(
                         apiFormat: normalizeApiFormat(config.apiFormat),
                         channels,
                         models,
-                        imageModel: normalizeModelOptionValue(config.imageModel || config.model, channels),
-                        videoModel: normalizeModelOptionValue(config.videoModel, channels),
-                        textModel: normalizeModelOptionValue(config.textModel || config.model, channels),
-                        audioModel: normalizeModelOptionValue(config.audioModel || defaultConfig.audioModel, channels),
+                        model: normalizeModelOptionValue(migrateDefaultModel(config.model), channels),
+                        imageModel: normalizeModelOptionValue(migrateDefaultModel(config.imageModel || config.model), channels),
+                        videoModel: normalizeModelOptionValue(migrateDefaultModel(config.videoModel), channels),
+                        textModel: normalizeModelOptionValue(migrateDefaultModel(config.textModel || config.model), channels),
+                        audioModel: normalizeModelOptionValue(migrateDefaultModel(config.audioModel || defaultConfig.audioModel), channels),
                         audioVoice: config.audioVoice || defaultConfig.audioVoice,
                         audioFormat: config.audioFormat || defaultConfig.audioFormat,
                         audioSpeed: config.audioSpeed || defaultConfig.audioSpeed,
@@ -246,7 +257,7 @@ export const useConfigStore = create<ConfigStore>()(
                         vquality: config.vquality || "720",
                         videoGenerateAudio: config.videoGenerateAudio || "true",
                         videoWatermark: config.videoWatermark || "false",
-                        canvasImageCount: config.canvasImageCount || "3",
+                        canvasImageCount: config.canvasImageCount === "3" ? "1" : config.canvasImageCount || "1",
                     },
                 };
             },
@@ -331,7 +342,7 @@ export function resolveModelChannel(config: AiConfig, value: string) {
     const decoded = decodeChannelModel(value);
     const model = decoded?.model || value;
     const matched = decoded ? config.channels.find((channel) => channel.id === decoded.channelId) : config.channels.find((channel) => channel.models.some((item) => item.name === model));
-    return matched || config.channels[0] || createModelChannel({ id: "default", name: i18n.t("config.channels.defaultName"), baseUrl: config.baseUrl, apiKey: config.apiKey, apiFormat: config.apiFormat, models: config.models.map(modelOptionName).map((name) => ({ name, capability: guessCapability(name) })) });
+    return matched || config.channels[0] || createModelChannel({ id: DEFAULT_CHANNEL_ID, name: i18n.t("config.channels.dagouName"), baseUrl: DAGOUI_BASE_URL, apiKey: "", apiFormat: "openai", models: DEFAULT_CHANNEL_MODELS });
 }
 
 export function resolveModelRequestConfig(config: AiConfig, value: string) {
@@ -346,28 +357,44 @@ export function resolveModelRequestConfig(config: AiConfig, value: string) {
 }
 
 function normalizeChannels(config: AiConfig) {
-    const persistedChannels = Array.isArray(config.channels) ? config.channels : [];
+    const persistedChannels = (Array.isArray(config.channels) ? config.channels : []).filter((channel) => {
+        const id = channel.id?.trim();
+        const name = channel.name?.trim().toLowerCase();
+        return id !== "default" && !(!id && ["openai", "默认渠道", "default provider"].includes(name || ""));
+    });
     const channels = persistedChannels.map((channel, index) =>
-        createModelChannel({
-            ...channel,
-            id: channel.id || (index === 0 ? "default" : `channel-${index + 1}`),
-            name: channel.name || (index === 0 ? i18n.t("config.channels.defaultName") : i18n.t("config.channels.indexedName", { index: index + 1 })),
-            models: normalizeChannelModels(channel.models),
-        }),
+        (() => {
+            const id = channel.id || `channel-${index + 1}`;
+            const name = channel.name?.trim() || i18n.t("config.channels.indexedName", { index: index + 1 });
+            return createModelChannel({ ...channel, id, name, models: normalizeChannelModels(channel.models) });
+        })(),
     );
     if (!channels.length) {
         channels.push(
             createModelChannel({
-                id: "default",
-                name: i18n.t("config.channels.defaultName"),
-                baseUrl: config.baseUrl || defaultConfig.baseUrl,
-                apiKey: config.apiKey || "",
-                apiFormat: config.apiFormat || defaultConfig.apiFormat,
-                models: normalizeChannelModels([config.model, config.imageModel, config.videoModel, config.textModel, config.audioModel].map(modelOptionName)),
+                id: DEFAULT_CHANNEL_ID,
+                name: i18n.t("config.channels.dagouName"),
+                baseUrl: DAGOUI_BASE_URL,
+                apiKey: "",
+                apiFormat: "openai",
+                models: DEFAULT_CHANNEL_MODELS,
             }),
         );
     }
     return channels;
+}
+
+function ensureDagouChannel(channels: ModelChannel[]) {
+    if (channels.some((channel) => channel.id === DEFAULT_CHANNEL_ID)) return channels;
+    return [
+        ...channels,
+        createModelChannel({ id: DEFAULT_CHANNEL_ID, name: i18n.t("config.channels.dagouName"), baseUrl: DAGOUI_BASE_URL, apiFormat: "openai", models: DEFAULT_CHANNEL_MODELS }),
+    ];
+}
+
+function migrateDefaultModel(value: string | undefined) {
+    const normalized = (value || "").trim();
+    return DAGOUI_DEFAULT_MODEL_VALUES[normalized] || normalized;
 }
 
 export function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {
