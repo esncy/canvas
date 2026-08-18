@@ -204,7 +204,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                                     {channel.id === DEFAULT_CHANNEL_ID ? <Tag className="m-0 shrink-0">{t("config.channels.defaultChannel")}</Tag> : null}
                                                 </div>
                                                 <div className="mt-1 truncate text-xs text-stone-500">
-                                                    {apiFormatLabel(channel.apiFormat, t)} · {t("config.channels.modelCount", { count: channel.models.length })} · {channel.baseUrl || t("config.channels.missingUrl")}
+                                                    {apiFormatLabel(channel.apiFormat)} · {t("config.channels.modelCount", { count: channel.models.length })} · {channel.baseUrl || t("config.channels.missingUrl")}
                                                 </div>
                                             </div>
                                             <div className="flex shrink-0 gap-2">
@@ -392,9 +392,8 @@ function normalizeImageCount(value: string) {
     return String(Math.max(1, Math.min(15, Math.floor(Math.abs(Number(value)) || 3))));
 }
 
-function apiFormatLabel(apiFormat: ApiCallFormat, t: TFunction) {
+function apiFormatLabel(apiFormat: ApiCallFormat) {
     if (apiFormat === "gemini") return "Gemini";
-    if (apiFormat === "ark") return t("config.protocols.ark");
     return "OpenAI";
 }
 
